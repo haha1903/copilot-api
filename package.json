@@ -15,7 +15,7 @@
   },
   "type": "module",
   "bin": {
-    "copilot-api": "./dist/main.js"
+    "copilot-api": "./dist/main.mjs"
   },
   "files": [
     "dist"

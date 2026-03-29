@@ -1,9 +1,9 @@
 #!/bin/sh
 if [ "$1" = "--auth" ]; then
   # Run auth command
-  exec bun run dist/main.js auth
+  exec bun run dist/main.mjs auth
 else
   # Default command
-  exec bun run dist/main.js start -g "$GH_TOKEN" "$@"
+  exec bun run dist/main.mjs start -g "$GH_TOKEN" "$@"
 fi
 
