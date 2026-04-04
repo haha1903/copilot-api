@@ -16,6 +16,9 @@ export interface State {
   rateLimitSeconds?: number
   lastRequestTimestamp?: number
 
+  // Web search
+  braveApiKey?: string
+
   // Token refresh timer (for cleanup)
   tokenRefreshTimer?: ReturnType<typeof setInterval>
 }

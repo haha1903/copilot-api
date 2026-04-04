@@ -7,6 +7,7 @@ import { getTokenCount } from "~/lib/tokenizer"
 
 import { type AnthropicMessagesPayload } from "./anthropic-types"
 import { translateToOpenAI } from "./non-stream-translation"
+import { preprocessWebSearch } from "./web-search"
 
 /**
  * Handles token counting for Anthropic messages
@@ -17,7 +18,9 @@ export async function handleCountTokens(c: Context) {
 
     const anthropicPayload = await c.req.json<AnthropicMessagesPayload>()
 
-    const openAIPayload = translateToOpenAI(anthropicPayload)
+    const { payload: processedPayload } = preprocessWebSearch(anthropicPayload)
+
+    const openAIPayload = translateToOpenAI(processedPayload)
 
     const selectedModel = state.models?.data.find(
       (model) => model.id === anthropicPayload.model,
@@ -32,11 +35,11 @@ export async function handleCountTokens(c: Context) {
 
     const tokenCount = await getTokenCount(openAIPayload, selectedModel)
 
-    if (anthropicPayload.tools && anthropicPayload.tools.length > 0) {
+    if (processedPayload.tools && processedPayload.tools.length > 0) {
       let mcpToolExist = false
       if (anthropicBeta?.startsWith("claude-code")) {
-        mcpToolExist = anthropicPayload.tools.some((tool) =>
-          tool.name.startsWith("mcp__"),
+        mcpToolExist = processedPayload.tools.some(
+          (tool) => "name" in tool && tool.name.startsWith("mcp__"),
         )
       }
       if (!mcpToolExist) {

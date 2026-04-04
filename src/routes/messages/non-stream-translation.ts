@@ -14,15 +14,19 @@ import {
   type AnthropicMessage,
   type AnthropicMessagesPayload,
   type AnthropicResponse,
+  type AnthropicServerToolUseBlock,
   type AnthropicTextBlock,
   type AnthropicThinkingBlock,
   type AnthropicTool,
+  type AnthropicToolEntry,
   type AnthropicToolResultBlock,
   type AnthropicToolUseBlock,
   type AnthropicUserContentBlock,
   type AnthropicUserMessage,
+  type AnthropicWebSearchToolResultBlock,
 } from "./anthropic-types"
 import { mapOpenAIStopReasonToAnthropic } from "./utils"
+import { isServerTool } from "./web-search"
 
 // Payload translation
 
@@ -95,7 +99,9 @@ function handleUserMessage(message: AnthropicUserMessage): Array<Message> {
         block.type === "tool_result",
     )
     const otherBlocks = message.content.filter(
-      (block) => block.type !== "tool_result",
+      (block) =>
+        block.type !== "tool_result"
+        && (block as { type: string }).type !== "web_search_tool_result",
     )
 
     // Tool results must come first to maintain protocol: tool_use -> tool_result -> user
@@ -136,7 +142,8 @@ function handleAssistantMessage(
   }
 
   const toolUseBlocks = message.content.filter(
-    (block): block is AnthropicToolUseBlock => block.type === "tool_use",
+    (block): block is AnthropicToolUseBlock | AnthropicServerToolUseBlock =>
+      block.type === "tool_use" || block.type === "server_tool_use",
   )
 
   const textBlocks = message.content.filter(
@@ -147,33 +154,63 @@ function handleAssistantMessage(
     (block): block is AnthropicThinkingBlock => block.type === "thinking",
   )
 
+  const searchResultBlocks = message.content.filter(
+    (block): block is AnthropicWebSearchToolResultBlock =>
+      block.type === "web_search_tool_result",
+  )
+
+  const searchResultText = searchResultBlocks
+    .map((block) =>
+      block.content
+        .map((r) => `[${r.title}](${r.url})\n${r.encrypted_content}`)
+        .join("\n\n"),
+    )
+    .join("\n\n")
+
   // Combine text and thinking blocks, as OpenAI doesn't have separate thinking blocks
   const allTextContent = [
     ...textBlocks.map((b) => b.text),
     ...thinkingBlocks.map((b) => b.thinking),
+    ...(searchResultText ? [searchResultText] : []),
   ].join("\n\n")
 
-  return toolUseBlocks.length > 0 ?
-      [
-        {
-          role: "assistant",
-          content: allTextContent || null,
-          tool_calls: toolUseBlocks.map((toolUse) => ({
-            id: toolUse.id,
-            type: "function",
-            function: {
-              name: toolUse.name,
-              arguments: JSON.stringify(toolUse.input),
-            },
-          })),
-        },
-      ]
-    : [
-        {
-          role: "assistant",
-          content: mapContent(message.content),
-        },
-      ]
+  if (toolUseBlocks.length > 0) {
+    const messages: Array<Message> = [
+      {
+        role: "assistant",
+        content: allTextContent || null,
+        tool_calls: toolUseBlocks.map((toolUse) => ({
+          id: toolUse.id,
+          type: "function",
+          function: {
+            name: toolUse.name,
+            arguments: JSON.stringify(toolUse.input),
+          },
+        })),
+      },
+    ]
+
+    // server_tool_use results need tool responses
+    for (const block of searchResultBlocks) {
+      const resultsText = block.content
+        .map((r) => `[${r.title}](${r.url})\n${r.encrypted_content}`)
+        .join("\n\n")
+      messages.push({
+        role: "tool",
+        tool_call_id: block.tool_use_id,
+        content: resultsText,
+      })
+    }
+
+    return messages
+  }
+
+  return [
+    {
+      role: "assistant",
+      content: allTextContent || mapContent(message.content),
+    },
+  ]
 }
 
 function mapContent(
@@ -229,12 +266,21 @@ function mapContent(
 }
 
 function translateAnthropicToolsToOpenAI(
-  anthropicTools: Array<AnthropicTool> | undefined,
+  anthropicTools: Array<AnthropicToolEntry> | undefined,
 ): Array<Tool> | undefined {
   if (!anthropicTools) {
     return undefined
   }
-  return anthropicTools.map((tool) => ({
+
+  const regularTools = anthropicTools.filter(
+    (tool): tool is AnthropicTool => !isServerTool(tool),
+  )
+
+  if (regularTools.length === 0) {
+    return undefined
+  }
+
+  return regularTools.map((tool) => ({
     type: "function",
     function: {
       name: tool.name,

@@ -25,6 +25,7 @@ interface RunServerOptions {
   claudeCode: boolean
   showToken: boolean
   proxyEnv: boolean
+  braveApiKey?: string
 }
 
 export async function runServer(options: RunServerOptions): Promise<void> {
@@ -46,12 +47,17 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   state.rateLimitSeconds = options.rateLimit
   state.rateLimitWait = options.rateLimitWait
   state.showToken = options.showToken
+  state.braveApiKey = options.braveApiKey
+
+  if (state.braveApiKey) {
+    consola.info("Brave Search API key configured - web search enabled")
+  }
 
   await ensurePaths()
   await cacheVSCodeVersion()
 
   if (options.githubToken) {
-    state.githubToken = options.githubToken
+    state.githubToken = options.githubToken // eslint-disable-line require-atomic-updates
     consola.info("Using provided GitHub token")
   } else {
     await setupGitHubToken()
@@ -184,6 +190,11 @@ export const start = defineCommand({
       default: false,
       description: "Initialize proxy from environment variables",
     },
+    "brave-api-key": {
+      type: "string",
+      description:
+        "Brave Search API key for web search support (or set BRAVE_API_KEY env var)",
+    },
   },
   run({ args }) {
     const rateLimitRaw = args["rate-limit"]
@@ -202,6 +213,7 @@ export const start = defineCommand({
       claudeCode: args["claude-code"],
       showToken: args["show-token"],
       proxyEnv: args["proxy-env"],
+      braveApiKey: args["brave-api-key"] || process.env.BRAVE_API_KEY,
     })
   },
 })
