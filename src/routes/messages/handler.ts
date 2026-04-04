@@ -82,8 +82,11 @@ async function handleNonStreamingResponse(
   ctx: RequestContext,
   response: ChatCompletionResponse,
 ) {
-  const toolCalls = response.choices[0]?.message.tool_calls
-  const webSearchCall = toolCalls?.find((tc) =>
+  // Check all choices for web search tool calls
+  const allToolCalls = response.choices.flatMap(
+    (choice) => choice.message.tool_calls ?? [],
+  )
+  const webSearchCall = allToolCalls.find((tc) =>
     isWebSearchToolCall(tc.function.name),
   )
 
