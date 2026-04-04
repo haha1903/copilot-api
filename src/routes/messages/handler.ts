@@ -20,7 +20,10 @@ import {
   translateToAnthropic,
   translateToOpenAI,
 } from "./non-stream-translation"
-import { translateChunkToAnthropicEvents } from "./stream-translation"
+import {
+  translateChunkToAnthropicEvents,
+  translateErrorToAnthropicErrorEvent,
+} from "./stream-translation"
 
 export async function handleCompletion(c: Context) {
   await checkRateLimit(state)
@@ -62,26 +65,54 @@ export async function handleCompletion(c: Context) {
       toolCalls: {},
     }
 
-    for await (const rawEvent of response) {
-      consola.debug("Copilot raw stream event:", JSON.stringify(rawEvent))
-      if (rawEvent.data === "[DONE]") {
-        break
+    const idleTimeout = 30_000
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const resetTimer = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        consola.warn("Stream idle timeout reached, aborting")
+        stream.abort()
+      }, idleTimeout)
+    }
+
+    try {
+      resetTimer()
+      for await (const rawEvent of response) {
+        resetTimer()
+        consola.debug("Copilot raw stream event:", JSON.stringify(rawEvent))
+        if (rawEvent.data === "[DONE]") {
+          break
+        }
+
+        if (!rawEvent.data) {
+          continue
+        }
+
+        const chunk = JSON.parse(rawEvent.data) as ChatCompletionChunk
+        const events = translateChunkToAnthropicEvents(chunk, streamState)
+
+        for (const event of events) {
+          consola.debug("Translated Anthropic event:", JSON.stringify(event))
+          await stream.writeSSE({
+            event: event.type,
+            data: JSON.stringify(event),
+          })
+        }
       }
-
-      if (!rawEvent.data) {
-        continue
-      }
-
-      const chunk = JSON.parse(rawEvent.data) as ChatCompletionChunk
-      const events = translateChunkToAnthropicEvents(chunk, streamState)
-
-      for (const event of events) {
-        consola.debug("Translated Anthropic event:", JSON.stringify(event))
+    } catch (error) {
+      consola.error("Stream processing error:", error)
+      try {
+        const errorEvent = translateErrorToAnthropicErrorEvent()
         await stream.writeSSE({
-          event: event.type,
-          data: JSON.stringify(event),
+          event: errorEvent.type,
+          data: JSON.stringify(errorEvent),
         })
+      } catch {
+        // Client may have already disconnected
       }
+    } finally {
+      if (timer) clearTimeout(timer)
     }
   })
 }

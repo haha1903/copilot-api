@@ -19,26 +19,39 @@ export const setupCopilotToken = async () => {
   const { token, refresh_in } = await getCopilotToken()
   state.copilotToken = token
 
-  // Display the Copilot token to the screen
   consola.debug("GitHub Copilot Token fetched successfully!")
   if (state.showToken) {
     consola.info("Copilot token:", token)
   }
 
   const refreshInterval = (refresh_in - 60) * 1000
-  setInterval(async () => {
+  state.tokenRefreshTimer = setInterval(async () => {
     consola.debug("Refreshing Copilot token")
-    try {
-      const { token } = await getCopilotToken()
-      state.copilotToken = token
-      consola.debug("Copilot token refreshed")
-      if (state.showToken) {
-        consola.info("Refreshed Copilot token:", token)
+
+    const maxAttempts = 3
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const { token } = await getCopilotToken()
+        state.copilotToken = token
+        consola.debug("Copilot token refreshed")
+        if (state.showToken) {
+          consola.info("Refreshed Copilot token:", token)
+        }
+        return
+      } catch (error) {
+        consola.error(
+          `Failed to refresh Copilot token (attempt ${attempt}/${maxAttempts}):`,
+          error,
+        )
+        if (attempt < maxAttempts) {
+          const backoff = 1000 * Math.pow(2, attempt - 1)
+          await new Promise((resolve) => setTimeout(resolve, backoff))
+        }
       }
-    } catch (error) {
-      consola.error("Failed to refresh Copilot token:", error)
-      throw error
     }
+    consola.error(
+      "All attempts to refresh Copilot token failed. Will retry at next interval.",
+    )
   }, refreshInterval)
 }
 

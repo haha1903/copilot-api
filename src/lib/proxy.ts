@@ -1,18 +1,61 @@
 import consola from "consola"
 import { getProxyForUrl } from "proxy-from-env"
-import { Agent, ProxyAgent, setGlobalDispatcher, type Dispatcher } from "undici"
+import {
+  Agent,
+  ProxyAgent,
+  RetryAgent,
+  setGlobalDispatcher,
+  type Dispatcher,
+} from "undici"
+
+const AGENT_OPTIONS = {
+  connectTimeout: 10_000,
+  bodyTimeout: 30_000,
+  keepAliveTimeout: 30_000,
+  keepAliveMaxTimeout: 60_000,
+} as const
+
+const RETRY_OPTIONS = {
+  maxRetries: 3,
+  minTimeout: 1_000,
+  maxTimeout: 4_000,
+  timeoutFactor: 2,
+  methods: [
+    "GET",
+    "HEAD",
+    "OPTIONS",
+    "PUT",
+    "DELETE",
+    "TRACE",
+    "POST",
+  ] as Array<Dispatcher.HttpMethod>,
+  statusCodes: [500, 502, 503, 504, 429] as Array<number>,
+  errorCodes: [
+    "ECONNRESET",
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "ENETDOWN",
+    "ENETUNREACH",
+    "EHOSTDOWN",
+    "EHOSTUNREACH",
+    "EPIPE",
+    "UND_ERR_CONNECT_TIMEOUT",
+    "UND_ERR_HEADERS_TIMEOUT",
+    "UND_ERR_BODY_TIMEOUT",
+    "UND_ERR_SOCKET",
+  ] as Array<string>,
+}
 
 export function initProxyFromEnv(): void {
   if (typeof Bun !== "undefined") return
 
   try {
-    const direct = new Agent()
+    const direct = new Agent(AGENT_OPTIONS)
     const proxies = new Map<string, ProxyAgent>()
 
-    // We only need a minimal dispatcher that implements `dispatch` at runtime.
-    // Typing the object as `Dispatcher` forces TypeScript to require many
-    // additional methods. Instead, keep a plain object and cast when passing
-    // to `setGlobalDispatcher`.
+    // Minimal dispatcher that routes requests through proxy when configured.
+    // Typed as plain object and cast to Dispatcher to avoid implementing
+    // every abstract method.
     const dispatcher = {
       dispatch(
         options: Dispatcher.DispatchOptions,
@@ -46,7 +89,8 @@ export function initProxyFromEnv(): void {
           }
           consola.debug(`HTTP proxy route: ${origin.hostname} via ${label}`)
           return (agent as unknown as Dispatcher).dispatch(options, handler)
-        } catch {
+        } catch (err) {
+          consola.warn("Proxy dispatch error, falling back to direct:", err)
           return (direct as unknown as Dispatcher).dispatch(options, handler)
         }
       },
@@ -58,8 +102,13 @@ export function initProxyFromEnv(): void {
       },
     }
 
-    setGlobalDispatcher(dispatcher as unknown as Dispatcher)
-    consola.debug("HTTP proxy configured from environment (per-URL)")
+    const retryAgent = new RetryAgent(
+      dispatcher as unknown as Dispatcher,
+      RETRY_OPTIONS,
+    )
+
+    setGlobalDispatcher(retryAgent)
+    consola.debug("HTTP proxy + retry configured from environment (per-URL)")
   } catch (err) {
     consola.debug("Proxy setup skipped:", err)
   }

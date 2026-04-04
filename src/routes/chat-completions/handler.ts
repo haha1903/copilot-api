@@ -56,9 +56,28 @@ export async function handleCompletion(c: Context) {
 
   consola.debug("Streaming response")
   return streamSSE(c, async (stream) => {
-    for await (const chunk of response) {
-      consola.debug("Streaming chunk:", JSON.stringify(chunk))
-      await stream.writeSSE(chunk as SSEMessage)
+    const idleTimeout = 30_000
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const resetTimer = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        consola.warn("Stream idle timeout reached, aborting")
+        stream.abort()
+      }, idleTimeout)
+    }
+
+    try {
+      resetTimer()
+      for await (const chunk of response) {
+        resetTimer()
+        consola.debug("Streaming chunk:", JSON.stringify(chunk))
+        await stream.writeSSE(chunk as SSEMessage)
+      }
+    } catch (error) {
+      consola.error("Stream processing error:", error)
+    } finally {
+      if (timer) clearTimeout(timer)
     }
   })
 }

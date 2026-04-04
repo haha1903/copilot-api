@@ -15,6 +15,9 @@ export interface State {
   // Rate limiting configuration
   rateLimitSeconds?: number
   lastRequestTimestamp?: number
+
+  // Token refresh timer (for cleanup)
+  tokenRefreshTimer?: ReturnType<typeof setInterval>
 }
 
 export const state: State = {
