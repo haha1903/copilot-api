@@ -1,3 +1,4 @@
+import consola from "consola"
 import { Hono } from "hono"
 
 import { state } from "~/lib/state"
@@ -5,12 +6,18 @@ import { state } from "~/lib/state"
 export const tokenRoute = new Hono()
 
 tokenRoute.get("/", (c) => {
+  // Require GitHub token for authentication
+  const authHeader = c.req.header("authorization")
+  if (!authHeader || authHeader !== `token ${state.githubToken}`) {
+    return c.json({ error: "Unauthorized" }, 401)
+  }
+
   try {
     return c.json({
       token: state.copilotToken,
     })
   } catch (error) {
-    console.error("Error fetching token:", error)
+    consola.error("Error fetching token:", error)
     return c.json({ error: "Failed to fetch token", token: null }, 500)
   }
 })
