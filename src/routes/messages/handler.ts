@@ -34,7 +34,6 @@ import {
   executeWebSearch,
   isWebSearchToolCall,
   preprocessWebSearch,
-  WEB_SEARCH_FUNCTION_NAME,
   type WebSearchContext,
 } from "./web-search"
 
@@ -129,17 +128,13 @@ function buildContinuationPayload(
   webSearchCall: ToolCall,
   toolResult: { content: Array<AnthropicWebSearchResult> },
 ): AnthropicMessagesPayload {
-  const tools = original.tools?.filter(
-    (t) => !("name" in t) || t.name !== WEB_SEARCH_FUNCTION_NAME,
-  )
-
   const resultsText = toolResult.content
     .map((r) => `[${r.title}](${r.url})\n${r.encrypted_content}`)
     .join("\n\n")
 
   return {
     ...original,
-    tools: tools && tools.length > 0 ? tools : undefined,
+    tools: undefined,
     tool_choice: undefined,
     messages: [
       ...original.messages,
