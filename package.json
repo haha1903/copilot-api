@@ -39,29 +39,29 @@
     "*": "bun run lint --fix"
   },
   "dependencies": {
-    "citty": "^0.1.6",
-    "clipboardy": "^5.0.0",
+    "citty": "^0.2.2",
+    "clipboardy": "^5.3.1",
     "consola": "^3.4.2",
-    "fetch-event-stream": "^0.1.5",
-    "gpt-tokenizer": "^3.0.1",
-    "hono": "^4.12.9",
-    "proxy-from-env": "^1.1.0",
-    "srvx": "^0.11.14",
+    "fetch-event-stream": "^0.1.6",
+    "gpt-tokenizer": "^3.4.0",
+    "hono": "^4.12.12",
+    "proxy-from-env": "^2.1.0",
+    "srvx": "^0.11.15",
     "tiny-invariant": "^1.3.3",
-    "undici": "^7.24.6",
-    "zod": "^4.1.11"
+    "undici": "^8.0.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@echristian/eslint-config": "^0.0.54",
-    "@types/bun": "^1.2.23",
+    "@types/bun": "^1.3.11",
     "@types/proxy-from-env": "^1.0.4",
-    "bumpp": "^10.2.3",
-    "eslint": "^10.1.0",
-    "knip": "^6.1.0",
-    "lint-staged": "^16.2.3",
-    "prettier-plugin-packagejson": "^2.5.19",
+    "bumpp": "^11.0.1",
+    "eslint": "^10.2.0",
+    "knip": "^6.3.1",
+    "lint-staged": "^16.4.0",
+    "prettier-plugin-packagejson": "^3.0.2",
     "simple-git-hooks": "^2.13.1",
     "tsdown": "^0.21.7",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   }
 }
