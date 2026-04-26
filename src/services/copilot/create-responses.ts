@@ -26,8 +26,10 @@ type ResponseInputItem = {
 export const createResponses = async (payload: ResponsesPayload) => {
   if (!state.copilotToken) throw new Error("Copilot token not found")
 
-  const enableVision = hasVisionContent(payload)
-  const isAgentCall = hasAgentMessages(payload)
+  const sanitized = stripUnsupportedTools(payload)
+
+  const enableVision = hasVisionContent(sanitized)
+  const isAgentCall = hasAgentMessages(sanitized)
 
   const headers: Record<string, string> = {
     ...copilotHeaders(state, enableVision),
@@ -37,7 +39,7 @@ export const createResponses = async (payload: ResponsesPayload) => {
   const response = await fetch(`${copilotBaseUrl(state)}/responses`, {
     method: "POST",
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify(sanitized),
   })
 
   if (!response.ok) {
@@ -45,11 +47,25 @@ export const createResponses = async (payload: ResponsesPayload) => {
     throw new HTTPError("Failed to create responses", response)
   }
 
-  if (payload.stream) {
+  if (sanitized.stream) {
     return events(response)
   }
 
   return (await response.json()) as Record<string, unknown>
+}
+
+// Copilot's /responses rejects requests containing image_generation tools.
+const UNSUPPORTED_TOOL_TYPES = new Set(["image_generation"])
+
+function stripUnsupportedTools(payload: ResponsesPayload): ResponsesPayload {
+  if (!Array.isArray(payload.tools)) return payload
+  const tools = payload.tools as Array<{ type?: string }>
+  const filtered = tools.filter(
+    (tool) => !UNSUPPORTED_TOOL_TYPES.has(tool.type ?? ""),
+  )
+  return filtered.length === tools.length
+    ? payload
+    : { ...payload, tools: filtered }
 }
 
 function hasVisionContent(payload: ResponsesPayload): boolean {
