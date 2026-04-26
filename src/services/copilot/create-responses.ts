@@ -63,8 +63,8 @@ function stripUnsupportedTools(payload: ResponsesPayload): ResponsesPayload {
   const filtered = tools.filter(
     (tool) => !UNSUPPORTED_TOOL_TYPES.has(tool.type ?? ""),
   )
-  return filtered.length === tools.length
-    ? payload
+  return filtered.length === tools.length ?
+      payload
     : { ...payload, tools: filtered }
 }
 
