@@ -5,6 +5,7 @@ import { streamSSE } from "hono/streaming"
 
 import { awaitApproval } from "~/lib/approval"
 import { checkRateLimit } from "~/lib/rate-limit"
+import { startSSEKeepAlive } from "~/lib/sse-keepalive"
 import { state } from "~/lib/state"
 import { isNullish } from "~/lib/utils"
 import {
@@ -48,30 +49,35 @@ export async function handleResponses(c: Context) {
   // Streaming: forward SSE events directly from Copilot
   consola.debug("Streaming responses result")
   return streamSSE(c, async (stream) => {
-    for await (const rawEvent of response) {
-      consola.debug("Responses stream event:", JSON.stringify(rawEvent))
+    const stopKeepAlive = startSSEKeepAlive(stream)
+    try {
+      for await (const rawEvent of response) {
+        consola.debug("Responses stream event:", JSON.stringify(rawEvent))
 
-      if (rawEvent.data === "[DONE]") {
-        break
-      }
+        if (rawEvent.data === "[DONE]") {
+          break
+        }
 
-      if (!rawEvent.data) {
-        continue
-      }
+        if (!rawEvent.data) {
+          continue
+        }
 
-      // Extract event type from the data for the SSE event field
-      try {
-        const parsed = JSON.parse(rawEvent.data) as { type?: string }
-        await stream.writeSSE({
-          event: parsed.type ?? rawEvent.event ?? "message",
-          data: rawEvent.data,
-        })
-      } catch {
-        await stream.writeSSE({
-          event: rawEvent.event ?? "message",
-          data: rawEvent.data,
-        })
+        // Extract event type from the data for the SSE event field
+        try {
+          const parsed = JSON.parse(rawEvent.data) as { type?: string }
+          await stream.writeSSE({
+            event: parsed.type ?? rawEvent.event ?? "message",
+            data: rawEvent.data,
+          })
+        } catch {
+          await stream.writeSSE({
+            event: rawEvent.event ?? "message",
+            data: rawEvent.data,
+          })
+        }
       }
+    } finally {
+      stopKeepAlive()
     }
   })
 }
