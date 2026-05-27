@@ -1,6 +1,6 @@
 {
   "name": "copilot-api",
-  "version": "0.10.5",
+  "version": "0.10.6",
   "description": "Turn GitHub Copilot into OpenAI/Anthropic API compatible server. Usable with Claude Code!",
   "keywords": [
     "proxy",
@@ -37,6 +37,9 @@
   },
   "lint-staged": {
     "*": "bun run lint --fix"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.6"
   },
   "dependencies": {
     "citty": "^0.2.2",
