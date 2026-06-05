@@ -32,6 +32,7 @@ interface RunServerOptions {
   claudeCode: boolean
   showToken: boolean
   proxyEnv: boolean
+  apiKey?: string
   braveApiKey?: string
   tavilyApiKey?: string
 }
@@ -55,6 +56,7 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   state.rateLimitSeconds = options.rateLimit
   state.rateLimitWait = options.rateLimitWait
   state.showToken = options.showToken
+  state.apiKey = options.apiKey
 
   const searchProviders: Array<SearchProvider> = []
   if (options.braveApiKey)
@@ -205,6 +207,10 @@ export const start = defineCommand({
       default: false,
       description: "Initialize proxy from environment variables",
     },
+    "api-key": {
+      type: "string",
+      description: "API key for client authentication (or set API_KEY env var)",
+    },
     "brave-api-key": {
       type: "string",
       description:
@@ -232,6 +238,7 @@ export const start = defineCommand({
       claudeCode: args["claude-code"],
       showToken: args["show-token"],
       proxyEnv: args["proxy-env"],
+      apiKey: args["api-key"] || process.env.API_KEY,
       braveApiKey: args["brave-api-key"] || process.env.BRAVE_API_KEY,
       tavilyApiKey: args["tavily-api-key"] || process.env.TAVILY_API_KEY,
     })

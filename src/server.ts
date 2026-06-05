@@ -2,6 +2,7 @@ import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { logger } from "hono/logger"
 
+import { authMiddleware } from "./lib/auth"
 import { state } from "./lib/state"
 import { completionRoutes } from "./routes/chat-completions/route"
 import { embeddingRoutes } from "./routes/embeddings/route"
@@ -14,6 +15,7 @@ import { usageRoute } from "./routes/usage/route"
 export const server = new Hono()
 
 server.use(logger())
+server.use(authMiddleware)
 server.use(
   cors({
     origin: (origin) => {

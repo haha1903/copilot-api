@@ -17,6 +17,7 @@ export interface State {
   lastRequestTimestamp?: number
 
   searchManager?: SearchManager
+  apiKey?: string
 
   tokenRefreshTimer?: ReturnType<typeof setInterval>
 }
