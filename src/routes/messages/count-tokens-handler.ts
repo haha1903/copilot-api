@@ -7,18 +7,15 @@ import { getTokenCount } from "~/lib/tokenizer"
 
 import { type AnthropicMessagesPayload } from "./anthropic-types"
 import { translateToOpenAI } from "./non-stream-translation"
-import { preprocessWebSearch } from "./web-search"
+import { stripWebSearchTools } from "./web-search-emulation"
 
-/**
- * Handles token counting for Anthropic messages
- */
 export async function handleCountTokens(c: Context) {
   try {
     const anthropicBeta = c.req.header("anthropic-beta")
 
     const anthropicPayload = await c.req.json<AnthropicMessagesPayload>()
 
-    const { payload: processedPayload } = preprocessWebSearch(anthropicPayload)
+    const processedPayload = stripWebSearchTools(anthropicPayload)
 
     const openAIPayload = translateToOpenAI(processedPayload)
 

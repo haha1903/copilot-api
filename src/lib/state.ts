@@ -1,4 +1,5 @@
 import type { ModelsResponse } from "~/services/copilot/get-models"
+import type { SearchManager } from "~/services/search/manager"
 
 export interface State {
   githubToken?: string
@@ -12,14 +13,11 @@ export interface State {
   rateLimitWait: boolean
   showToken: boolean
 
-  // Rate limiting configuration
   rateLimitSeconds?: number
   lastRequestTimestamp?: number
 
-  // Web search
-  braveApiKey?: string
+  searchManager?: SearchManager
 
-  // Token refresh timer (for cleanup)
   tokenRefreshTimer?: ReturnType<typeof setInterval>
 }
 

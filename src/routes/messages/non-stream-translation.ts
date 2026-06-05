@@ -26,9 +26,18 @@ import {
   type AnthropicWebSearchToolResultBlock,
 } from "./anthropic-types"
 import { mapOpenAIStopReasonToAnthropic } from "./utils"
-import { isServerTool } from "./web-search"
 
-// Payload translation
+const WEB_SEARCH_TOOL_TYPES = new Set([
+  "web_search",
+  "web_search_20250305",
+  "web_search_20260209",
+  "google_search",
+])
+
+function isServerTool(tool: AnthropicToolEntry): boolean {
+  if (!("type" in tool)) return false
+  return WEB_SEARCH_TOOL_TYPES.has(tool.type as string)
+}
 
 export function translateToOpenAI(
   payload: AnthropicMessagesPayload,
@@ -51,7 +60,6 @@ export function translateToOpenAI(
 }
 
 function translateModelName(model: string): string {
-  // Subagent requests use a specific model number which Copilot doesn't support
   if (model.startsWith("claude-sonnet-4-")) {
     return model.replace(/^claude-sonnet-4-.*/, "claude-sonnet-4")
   } else if (model.startsWith("claude-opus-")) {
@@ -104,7 +112,6 @@ function handleUserMessage(message: AnthropicUserMessage): Array<Message> {
         && (block as { type: string }).type !== "web_search_tool_result",
     )
 
-    // Tool results must come first to maintain protocol: tool_use -> tool_result -> user
     for (const block of toolResultBlocks) {
       newMessages.push({
         role: "tool",
@@ -167,7 +174,6 @@ function handleAssistantMessage(
     )
     .join("\n\n")
 
-  // Combine text and thinking blocks, as OpenAI doesn't have separate thinking blocks
   const allTextContent = [
     ...textBlocks.map((b) => b.text),
     ...thinkingBlocks.map((b) => b.thinking),
@@ -190,7 +196,6 @@ function handleAssistantMessage(
       },
     ]
 
-    // server_tool_use results need tool responses
     for (const block of searchResultBlocks) {
       const resultsText = block.content
         .map((r) => `[${r.title}](${r.url})\n${r.encrypted_content}`)
@@ -322,19 +327,14 @@ function translateAnthropicToolChoiceToOpenAI(
   }
 }
 
-// Response translation
-
 export function translateToAnthropic(
   response: ChatCompletionResponse,
 ): AnthropicResponse {
-  // Merge content from all choices
   const allTextBlocks: Array<AnthropicTextBlock> = []
   const allToolUseBlocks: Array<AnthropicToolUseBlock> = []
   let stopReason: "stop" | "length" | "tool_calls" | "content_filter" | null =
-    null // default
-  stopReason = response.choices[0]?.finish_reason ?? stopReason
+    response.choices[0]?.finish_reason ?? null
 
-  // Process all choices to extract text and tool use blocks
   for (const choice of response.choices) {
     const textBlocks = getAnthropicTextBlocks(choice.message.content)
     const toolUseBlocks = getAnthropicToolUseBlocks(choice.message.tool_calls)
@@ -342,13 +342,10 @@ export function translateToAnthropic(
     allTextBlocks.push(...textBlocks)
     allToolUseBlocks.push(...toolUseBlocks)
 
-    // Use the finish_reason from the first choice, or prioritize tool_calls
     if (choice.finish_reason === "tool_calls" || stopReason === "stop") {
       stopReason = choice.finish_reason
     }
   }
-
-  // Note: GitHub Copilot doesn't generate thinking blocks, so we don't include them in responses
 
   return {
     id: response.id,

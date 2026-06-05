@@ -6,6 +6,8 @@ import consola from "consola"
 import { serve, type ServerHandler } from "srvx"
 import invariant from "tiny-invariant"
 
+import type { SearchProvider } from "./services/search"
+
 import { ensurePaths } from "./lib/paths"
 import { initProxyFromEnv } from "./lib/proxy"
 import { generateEnvScript } from "./lib/shell"
@@ -13,6 +15,11 @@ import { state } from "./lib/state"
 import { setupCopilotToken, setupGitHubToken } from "./lib/token"
 import { cacheModels, cacheVSCodeVersion } from "./lib/utils"
 import { server } from "./server"
+import {
+  BraveSearchProvider,
+  SearchManager,
+  TavilySearchProvider,
+} from "./services/search"
 
 interface RunServerOptions {
   port: number
@@ -26,6 +33,7 @@ interface RunServerOptions {
   showToken: boolean
   proxyEnv: boolean
   braveApiKey?: string
+  tavilyApiKey?: string
 }
 
 export async function runServer(options: RunServerOptions): Promise<void> {
@@ -47,10 +55,17 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   state.rateLimitSeconds = options.rateLimit
   state.rateLimitWait = options.rateLimitWait
   state.showToken = options.showToken
-  state.braveApiKey = options.braveApiKey
 
-  if (state.braveApiKey) {
-    consola.info("Brave Search API key configured - web search enabled")
+  const searchProviders: Array<SearchProvider> = []
+  if (options.braveApiKey)
+    searchProviders.push(new BraveSearchProvider(options.braveApiKey))
+  if (options.tavilyApiKey)
+    searchProviders.push(new TavilySearchProvider(options.tavilyApiKey))
+  if (searchProviders.length > 0) {
+    state.searchManager = new SearchManager(searchProviders)
+    consola.info(
+      `Web search enabled (providers: ${state.searchManager.providerNames()})`,
+    )
   }
 
   await ensurePaths()
@@ -195,6 +210,11 @@ export const start = defineCommand({
       description:
         "Brave Search API key for web search support (or set BRAVE_API_KEY env var)",
     },
+    "tavily-api-key": {
+      type: "string",
+      description:
+        "Tavily Search API key for web search support (or set TAVILY_API_KEY env var)",
+    },
   },
   run({ args }) {
     const rateLimitRaw = args["rate-limit"]
@@ -213,6 +233,7 @@ export const start = defineCommand({
       showToken: args["show-token"],
       proxyEnv: args["proxy-env"],
       braveApiKey: args["brave-api-key"] || process.env.BRAVE_API_KEY,
+      tavilyApiKey: args["tavily-api-key"] || process.env.TAVILY_API_KEY,
     })
   },
 })

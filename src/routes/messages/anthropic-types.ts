@@ -1,5 +1,3 @@
-// Anthropic API Types
-
 export interface AnthropicMessagesPayload {
   model: string
   messages: Array<AnthropicMessage>
@@ -88,7 +86,6 @@ export interface AnthropicTool {
   input_schema: Record<string, unknown>
 }
 
-// Server tool types (e.g. web search)
 export interface AnthropicServerTool {
   type: "web_search_20250305" | "web_search_20260209"
   name: string
@@ -99,7 +96,6 @@ export interface AnthropicServerTool {
 
 export type AnthropicToolEntry = AnthropicTool | AnthropicServerTool
 
-// Server tool use block (in assistant response content)
 export interface AnthropicServerToolUseBlock {
   type: "server_tool_use"
   id: string
@@ -107,7 +103,6 @@ export interface AnthropicServerToolUseBlock {
   input: Record<string, unknown>
 }
 
-// Web search result types
 export interface AnthropicWebSearchResult {
   type: "web_search_result"
   url: string
@@ -148,7 +143,6 @@ export interface AnthropicResponse {
 
 export type AnthropicResponseContentBlock = AnthropicAssistantContentBlock
 
-// Anthropic Stream Event Types
 export interface AnthropicMessageStartEvent {
   type: "message_start"
   message: Omit<
@@ -238,7 +232,6 @@ export type AnthropicStreamEventData =
   | AnthropicPingEvent
   | AnthropicErrorEvent
 
-// State for streaming translation
 export interface AnthropicStreamState {
   messageStartSent: boolean
   contentBlockIndex: number
