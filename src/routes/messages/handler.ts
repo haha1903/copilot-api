@@ -80,12 +80,9 @@ function streamNormally(
       contentBlockOpen: false,
       toolCalls: {},
     }
-    const timer = createIdleTimer(stream)
 
     try {
-      timer.reset()
       for await (const rawEvent of response) {
-        timer.reset()
         if (rawEvent.data === "[DONE]") break
         if (!rawEvent.data) continue
 
@@ -102,26 +99,8 @@ function streamNormally(
     } catch (error) {
       consola.error("Stream processing error:", error)
       await emitStreamError(stream)
-    } finally {
-      timer.clear()
     }
   })
-}
-
-function createIdleTimer(stream: SSEStreamingApi) {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  return {
-    reset() {
-      if (timer) clearTimeout(timer)
-      timer = setTimeout(() => {
-        consola.warn("Stream idle timeout reached, aborting")
-        stream.abort()
-      }, 30_000)
-    },
-    clear() {
-      if (timer) clearTimeout(timer)
-    },
-  }
 }
 
 async function emitStreamError(stream: SSEStreamingApi) {
