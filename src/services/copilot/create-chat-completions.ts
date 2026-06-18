@@ -32,6 +32,11 @@ export const createChatCompletions = async (
     method: "POST",
     headers,
     body: JSON.stringify(payload),
+    // Whole-request timeout as a safety net against a wedged upstream
+    // connection. Without it, a hung stream blocks the route handler's
+    // `for await` forever and holds the only replica open. 10 minutes is
+    // far above any real completion latency.
+    signal: AbortSignal.timeout(600_000),
   })
 
   if (!response.ok) {
